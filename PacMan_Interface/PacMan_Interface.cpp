@@ -33,8 +33,9 @@ void DrawMaze(void);
 void DrawScore(float posX, float posY);
 void DrawPacman(void);
 bool Pacman_Collision(float nextX, float nextY);
-
 void MovePacman(float dx, float dy);
+void DrawItems(void);
+void CheckItemCollision();
 
 int pacman_dir = 0; // 0: right, 1: up, 2: left, 3: down
 float pacman_pos[2] = { 0.1f, 0.1f };
@@ -43,21 +44,57 @@ bool bRight = true;
 float ghost_pos[2] = { 0.1f, 0.7f };
 float ghost_move = 0.05f;
 
-bool items[10][10];
-int num_items = 0, total_items = 0;
-
+int num_score = 0;
 float wall_width = 0.2f;
-bool maze[10][10] = { { 1, 0, 1, 1, 1, 1, 1, 1, 1, 1 },
+
+bool maze[10][10] = { { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
                       { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
-                      { 1, 0, 1, 1, 1, 1, 1, 1, 0, 1 },
-                      { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+                      { 1, 0, 1, 1, 1, 0, 0, 1, 0, 1 },
+                      { 1, 0, 0, 0, 0, 1, 1, 0, 0, 1 },
                       { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
                       { 1, 1, 1, 1, 0, 1, 1, 1, 0, 1 },
                       { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
-                      { 1, 0, 1, 1, 1, 1, 1, 1, 1, 1 },
+                      { 1, 0, 1, 0, 1, 1, 1, 1, 0, 1 },
                       { 1, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
-                      { 1, 1, 1, 1, 1, 1, 1, 1, 0, 1 } };
+                      { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 } };
 
+/*
+bool items[10][10] = { { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 1, 1, 1, 1, 1, 1, 1, 1, 0 },
+                       { 0, 1, 0, 0, 0, 1, 1, 0, 1, 0 },
+                       { 0, 1, 1, 1, 1, 0, 0, 1, 1, 0 },
+                       { 0, 1, 1, 1, 1, 1, 1, 1, 1, 0 },
+                       { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0 },
+                       { 0, 1, 1, 1, 1, 1, 1, 1, 1, 0 },
+                       { 0, 1, 0, 1, 0, 0, 0, 0, 1, 0 },
+                       { 0, 1, 1, 1, 1, 1, 1, 1, 1, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+*/
+
+bool items[10][10] = { { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                       { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+
+int CountItems(bool items[10][10]) {
+    int num_items = 0;
+    for (int i = 0; i < 10; ++i) {
+        for (int j = 0; j < 10; ++j) {
+            if (items[i][j]) {
+                num_items++;
+            }
+        }
+    }
+    return num_items;
+}
+
+int total_items = CountItems(items);
 
 GLubyte wall_pattern[] = { 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xfe,
                            0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xfe,
@@ -217,6 +254,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         glListBase(1000);
         
         break;
+
+    case WM_TIMER:
+        // 게임 오버 조건: 남아 있는 아이템이 없으면
+        if (total_items == 0) {
+            KillTimer(hWnd, 1);
+            MessageBox(hWnd, "You Win!", "Congratulations!", MB_OK | MB_ICONINFORMATION);
+            PostQuitMessage(0);
+        }
+        break;
 /*
     case WM_COMMAND:
         {
@@ -372,17 +418,17 @@ void DrawScene(HDC MyDC)
 {
     glEnable(GL_DEPTH_TEST);
 
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
     glColor3f(0.0f, 0.0f, 0.0f);
     DrawScore(1.1f, 0.8f);
-
     DrawMaze();
-
     DrawPacman();
+    DrawItems();
+    CheckItemCollision();
 
     SwapBuffers(MyDC);
 
@@ -390,7 +436,7 @@ void DrawScene(HDC MyDC)
 }
 
 
-void DrawMaze(void)
+void DrawMaze(void) 																 // Drawing Maze        
 {
     glEnable(GL_POLYGON_STIPPLE);
     glPolygonStipple(wall_pattern);
@@ -413,11 +459,11 @@ void DrawMaze(void)
     return;
 }
 
-void DrawScore(float posX, float posY)
+void DrawScore(float posX, float posY)                                                  // Drawing Score
 {
     // Use font bitmaps
     char str[256];
-    sprintf_s(str, "Score: %2d", num_items);
+    sprintf_s(str, "Score: %2d", num_score);
 
 	glRasterPos2f(posX, posY);
 	glCallLists(strlen(str), GL_UNSIGNED_BYTE, str);
@@ -428,7 +474,7 @@ void DrawScore(float posX, float posY)
 	return;
 }
 
-void DrawPacman(void)
+void DrawPacman(void)                                                                   // Drawing Pacman
 {
     glColor3f(1.0f, 1.0f, 0.0f);
     glPushMatrix();
@@ -461,7 +507,7 @@ void DrawPacman(void)
     glPopMatrix();
 }
 
-bool Pacman_Collision(float nextX, float nextY) {
+bool Pacman_Collision(float nextX, float nextY) {                                       // Pacman collision detection
     float x0 = -1.0f, y0 = 1.0f; // start from left-top
     for (int row = 0; row < 10; row++) {
         for (int col = 0; col < 10; col++) {
@@ -482,15 +528,59 @@ bool Pacman_Collision(float nextX, float nextY) {
     return false;
 }
 
-void MovePacman(float dx, float dy) {
+void MovePacman(float dx, float dy)
+{
+    // 팩맨의 새로운 위치를 계산합니다.
     float nextX = centerPos[0][0] + dx;
     float nextY = centerPos[0][1] + dy;
 
-    // 충돌 검사
+    // 충돌 여부를 확인합니다.
     if (!Pacman_Collision(nextX, nextY)) {
+        // 충돌하지 않으면 팩맨의 위치를 업데이트합니다.
         centerPos[0][0] = nextX;
         centerPos[0][1] = nextY;
         moveDirection[0][0] = dx;
         moveDirection[0][1] = dy;
+
+        // 아이템 충돌을 확인합니다.
+        CheckItemCollision();
+    }
+}
+
+
+
+void DrawItems(void) {																  // Drawing Items by using rray
+    float x0 = -1.0f, y0 = 1.0f; // start from left-top
+    glColor3f(1.0f, 1.0f, 1.0f); // 아이템 색상 (하얀색)
+    for (int row = 0; row < 10; row++) {
+        for (int col = 0; col < 10; col++) {
+            if (items[row][col]) {
+                float itemRadius = 0.02f; // 아이템 크기
+                glBegin(GL_TRIANGLE_FAN);
+                glVertex2f(x0 + wall_width / 2, y0 - wall_width / 2); // 중심
+                for (int i = 0; i <= 20; i++) {
+                    float angle = 2 * PI * i / 20;
+                    glVertex2f((x0 + wall_width / 2) + itemRadius * cos(angle),
+                        (y0 - wall_width / 2) + itemRadius * sin(angle));
+                }
+                glEnd();
+            }
+            x0 += wall_width;
+        }
+        x0 = -1.0f;
+        y0 -= wall_width;
+    }
+}
+
+void CheckItemCollision() {
+    int row = (int)((1.0f - centerPos[0][1]) / wall_width); // y 좌표 변환
+    int col = (int)((centerPos[0][0] + 1.0f) / wall_width); // x 좌표 변환
+
+    if (row >= 0 && row < 10 && col >= 0 && col < 10) {
+        if (items[row][col]) {
+            items[row][col] = false; // 아이템 먹기
+            num_score++; // 점수 증가
+            total_items = CountItems(items); // 남아 있는 아이템의 수 다시 계산
+        }
     }
 }
